@@ -19,5 +19,54 @@
     "pattern_matched": "tr1",
     "attempts": 460501,
     "found_at": "2025-06-26T21:04:26.351815Z"
+  },
+  {
+    "public_key": "AbEsCJPepQrz6wYaHsYB2UnRF9TMaan9TsQio283Dr9F",
+    "private_key": "UVNYJfQzUxPSpH54t97cQvnncaAdbRwj4eWKqWqojyCNzd19ev7YF9rtVnHTmGNYUDwcpe2hPmNAJD18JyGyetq",
+    "pattern_matched": "ab",
+    "attempts": 144,
+    "found_at": "2025-06-26T21:09:31.711926Z"
+  },
+  {
+    "public_key": "Abq62tViB6c84WPFAxRGGkzwknEsLjduCCSSRLT7SGXz",
+    "private_key": "4EYsdj6gzrAbBFSPDhqCasyq4k5vNzmogHoaxnKMDNKLVAxYCgWFgfkkmJ2TcxEmdvjfK1bibbEqCDufPRmC23SY",
+    "pattern_matched": "ab",
+    "attempts": 194,
+    "found_at": "2025-06-26T21:09:56.664081Z"
+  },
+  {
+    "public_key": "SWigyLaNM16dD1VnREU1ZRRZMSGFugUpA7mB1Mc9xAS",
+    "private_key": "M8iiP864EbuxpAwYWmkJyg4xvDbmUEWbgYNEnL4E2AYst8Gguyrt9v8AumwrdY8d5Yo2tfXvGi9PudsSpgz8ytS",
+    "pattern_matched": "swig",
+    "attempts": 937670,
+    "found_at": "2025-06-26T21:11:10.438122Z"
+  },
+  {
+    "public_key": "Ab9HWpiq8PTYmU7k3YJyCcxHEkhbYtS9sKtCZut9kn79",
+    "private_key": "5o8pmpHLeA6qsqubHyoohKBBZpx2UsvS9Hy3ZtWYSzSFPFbTkyZyw9dhdYcy9LKPBGsQE1RZxDmVbdHFGN6zoR4b",
+    "pattern_matched": "ab",
+    "attempts": 121,
+    "found_at": "2025-06-26T21:13:40.702224Z"
+  },
+  {
+    "public_key": "Abh4EvtXSwY5bD5sgHdkj4kvRiBJFxWtCSpsJ2QBGcJo",
+    "private_key": "5wLGjVP1Gp6LFp3ETxKCjJ3HqbcpxfaFvBkV7eZ1qZi5zFJnugocWPgBsTrzs64emoBXtTR9wiQXD8i7SeFTf4Gj",
+    "pattern_matched": "ab",
+    "attempts": 162,
+    "found_at": "2025-06-26T21:13:40.703058Z"
+  },
+  {
+    "public_key": "ABcDyXWYfqeq4om6UTDvUqEtwX6FwxebP6LVqxxDDm2N",
+    "private_key": "4C7GF9pm6i6icVqKhfXqa576b3hC3QWnYftXoSNq2iKLyikaL31hWjTMf5UKFqmacf4ptjdRP39vh9CcF8DHgHjc",
+    "pattern_matched": "abcd",
+    "attempts": 87364,
+    "found_at": "2025-06-26T21:14:50.898546Z"
+  },
+  {
+    "public_key": "ABCDNASoBLAWCnQzpq6h5wBrTWTysqy2nhbG73irFRZr",
+    "private_key": "LG6CdSsyiPds37QPMAN6bDgVKqNLYA8vPEDfKrBMtBoqqB6MuNq8DQqfpBCwPvCzGu9udpmkScZLtHEZK5h9rVv",
+    "pattern_matched": "abcd",
+    "attempts": 149936,
+    "found_at": "2025-06-26T21:14:52.112462Z"
   }
 ]

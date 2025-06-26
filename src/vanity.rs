@@ -9,7 +9,7 @@ use solana_sdk::{
 };
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 use crate::opencl::OpenCLManager;
@@ -115,6 +115,30 @@ impl VanityGenerator {
                 .progress_chars("#>-"),
         );
 
+        // Start speed monitoring thread
+        let total_attempts_clone = Arc::clone(&self.total_attempts);
+        let speed_monitor_handle = thread::spawn(move || {
+            let mut last_attempts = 0u64;
+            let mut last_time = Instant::now();
+
+            loop {
+                thread::sleep(Duration::from_secs(1));
+                let current_attempts = *total_attempts_clone.lock().unwrap();
+                let current_time = Instant::now();
+                let elapsed = current_time.duration_since(last_time).as_secs_f64();
+
+                if elapsed > 0.0 {
+                    let attempts_diff = current_attempts - last_attempts;
+                    let speed_mhps = (attempts_diff as f64 / elapsed) / 1_000_000.0;
+                    let timestamp = chrono::Utc::now().format("%H:%M:%S");
+                    println!("[{}] Speed: {:.2} MH/s", timestamp, speed_mhps);
+                }
+
+                last_attempts = current_attempts;
+                last_time = current_time;
+            }
+        });
+
         // Start the search
         if let Some(device) = self.device {
             if let Some(ref opencl_manager) = self.opencl_manager {
@@ -126,6 +150,9 @@ impl VanityGenerator {
         } else {
             self.run_cpu_search(remaining_count, &progress_bar).await?;
         }
+
+        // Stop speed monitoring
+        drop(speed_monitor_handle);
 
         progress_bar.finish_with_message("Search completed!");
 
