@@ -1,0 +1,23 @@
+[
+  {
+    "public_key": "AbcDn6o73H9F7fTu6hpLLeurbaScfb2m4moqWchVSMpc",
+    "private_key": "3L4zci2ycuz9re6PrTLTjoCH9cCN1zTwZG4hBKNuWqP8yg4TABHCZAo6tk5Ji7H9SC1SC8MhyLDUgxQ7qYfTFD2",
+    "pattern_matched": "abcd",
+    "attempts": 20949,
+    "found_at": "2025-06-26T20:59:23.788399Z"
+  },
+  {
+    "public_key": "tRo6eeUzej71mSSJ8724xNKbhJzSpDHbs76pW2yxwJV",
+    "private_key": "YdaydSUPLbSs3rXscM5gJB7aXBmBEuXcxvVsnyw6fMtjKNAArUwYgkSgqiE3RjnJBiMogYaDgePCvczHtR7FHR7",
+    "pattern_matched": "tr",
+    "attempts": 3285,
+    "found_at": "2025-06-26T21:02:41.228899Z"
+  },
+  {
+    "public_key": "tr1KnSBZzE3jhExpd48ZFDRTf2dwLxdcFEv2Fw3pL6K",
+    "private_key": "vUHJKbL96atmtg3fttXTbpuM2di35ygZ6CGymPnc2Zx6qXSL1Bt5ubwHxnAAW3DnRmkKkYaGFniBzjms82ibuxK",
+    "pattern_matched": "tr1",
+    "attempts": 460501,
+    "found_at": "2025-06-26T21:04:26.351815Z"
+  }
+]
