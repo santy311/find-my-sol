@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Result};
 use ocl::{enums::DeviceInfo, Buffer, Context, Device, Kernel, MemFlags, Platform, Program, Queue};
+use rand::Rng;
 use std::collections::HashMap;
 
 pub struct OpenCLManager {
@@ -109,15 +110,13 @@ impl OpenCLManager {
 
         let kernel = Kernel::builder()
             .program(&program)
-            .name("generate_vanity_keys")
-            .global_work_size(1024 * 1024) // 1M work items
-            .arg(None::<&Buffer<u32>>) // seed buffer
-            .arg(None::<&Buffer<u8>>) // result buffer
-            .arg(None::<&Buffer<u8>>) // starts_with_pattern buffer
-            .arg(0u32) // starts_with_len
-            .arg(None::<&Buffer<u8>>) // ends_with_pattern buffer
-            .arg(0u32) // ends_with_len
-            .arg(0u32) // case_sensitive
+            .name("generate_random_seeds_optimized")
+            .global_work_size(256 * 1024) // 256K work items for better GPU utilization
+            .local_work_size(256) // Optimal work group size for most GPUs
+            .arg(None::<&Buffer<u32>>) // base_seeds buffer
+            .arg(None::<&Buffer<u32>>) // output_seeds buffer
+            .arg(1u32) // num_seeds_per_base
+            .arg(0u32) // total_seeds_needed (will be set dynamically)
             .build()?;
 
         Ok(VanityKernel {
@@ -199,5 +198,54 @@ impl VanityKernel {
         result_buffer.read(&mut results).enq()?;
 
         Ok(results)
+    }
+
+    pub fn generate_seeds(&self, num_seeds: usize) -> Result<Vec<u32>> {
+        // Generate base seeds with better distribution
+        let mut base_seeds = Vec::new();
+        let mut rng = rand::thread_rng();
+        let num_base_seeds = (num_seeds / 4096).max(1024); // More base seeds for better distribution
+        for _ in 0..num_base_seeds {
+            base_seeds.push(rng.gen());
+        }
+
+        let base_seeds_buffer = Buffer::<u32>::builder()
+            .queue(self.queue.clone())
+            .flags(MemFlags::new().read_only().copy_host_ptr())
+            .len(base_seeds.len())
+            .copy_host_slice(&base_seeds)
+            .build()?;
+
+        let output_seeds_buffer = Buffer::<u32>::builder()
+            .queue(self.queue.clone())
+            .flags(MemFlags::new().write_only())
+            .len(num_seeds)
+            .build()?;
+
+        // Calculate optimal work group size
+        let work_group_size = 256;
+        let global_work_size =
+            ((num_seeds + 3) / 4 + work_group_size - 1) / work_group_size * work_group_size;
+
+        // Set kernel arguments
+        self.kernel.set_arg(0, &base_seeds_buffer)?;
+        self.kernel.set_arg(1, &output_seeds_buffer)?;
+        self.kernel.set_arg(2, &(4u32))?; // 4 seeds per work item
+        self.kernel.set_arg(3, &(num_seeds as u32))?; // total_seeds_needed
+
+        // Execute kernel with optimized work group size
+        unsafe {
+            self.kernel
+                .cmd()
+                .queue(&self.queue)
+                .global_work_size(global_work_size)
+                .local_work_size(work_group_size)
+                .enq()?;
+        }
+
+        let mut seeds = vec![0u32; num_seeds];
+        output_seeds_buffer.read(&mut seeds).enq()?;
+
+        Ok(seeds)
     }
 }

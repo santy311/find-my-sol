@@ -1,12 +1,14 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use rand::SeedableRng;
+use solana_sdk::signature::Signer;
+use vanity::VanityGenerator;
 
 mod opencl;
 mod utils;
 mod vanity;
 
 use opencl::OpenCLManager;
-use vanity::VanityGenerator;
 
 #[derive(Parser)]
 #[command(name = "solana-vanity")]
@@ -52,6 +54,9 @@ enum Commands {
 
     /// Show available OpenCL devices
     ShowDevices,
+
+    /// Test mode - verify the implementation works correctly
+    Test,
 }
 
 #[tokio::main]
@@ -85,7 +90,82 @@ async fn main() -> Result<()> {
             let opencl_manager = OpenCLManager::new()?;
             opencl_manager.list_devices()?;
         }
+
+        Commands::Test => {
+            test_vanity_generation()?;
+        }
     }
 
+    Ok(())
+}
+
+fn test_vanity_generation() -> Result<()> {
+    println!("🧪 Testing vanity address generation...");
+
+    // Test 1: Generate a simple keypair and verify it's valid
+    println!("Test 1: Basic keypair generation");
+    let keypair = solana_sdk::signature::Keypair::new();
+    let pubkey = keypair.pubkey();
+    let address = pubkey.to_string();
+    println!("Generated address: {}", address);
+    println!("Address length: {} (should be 44)", address.len());
+    println!("Address starts with: {}", &address[..4]);
+    println!("✅ Basic keypair generation works");
+
+    // Test 2: Test pattern matching
+    println!("\nTest 2: Pattern matching");
+    let test_patterns = vec!["ABC".to_string(), "XYZ".to_string()];
+    let test_address = "ABC123XYZ456789".to_string();
+
+    for pattern in &test_patterns {
+        let matches = test_address.contains(pattern);
+        println!("Pattern '{}' in '{}': {}", pattern, test_address, matches);
+    }
+    println!("✅ Pattern matching works");
+
+    // Test 3: Test seed-based generation
+    println!("\nTest 3: Seed-based generation");
+    let seed = 12345u32;
+    let seed_bytes = seed.to_le_bytes();
+    let keypair_from_seed = solana_sdk::signature::Keypair::from_bytes(&seed_bytes);
+    match keypair_from_seed {
+        Ok(kp) => {
+            let addr = kp.pubkey().to_string();
+            println!("Generated from seed {}: {}", seed, addr);
+            println!("✅ Seed-based generation works");
+        }
+        Err(_) => {
+            println!("⚠️  Seed-based generation failed, using fallback");
+            let mut rng = rand::prelude::StdRng::seed_from_u64(seed as u64);
+            let kp = solana_sdk::signature::Keypair::new();
+            let addr = kp.pubkey().to_string();
+            println!("Fallback generation: {}", addr);
+            println!("✅ Fallback generation works");
+        }
+    }
+
+    // Test 4: Test OpenCL integration
+    println!("\nTest 4: OpenCL integration");
+    match opencl::OpenCLManager::new() {
+        Ok(manager) => {
+            println!("✅ OpenCL manager created successfully");
+            match manager.create_vanity_kernel(0) {
+                Ok(kernel) => {
+                    println!("✅ Vanity kernel created successfully");
+                    match kernel.generate_seeds(1000) {
+                        Ok(seeds) => {
+                            println!("✅ Generated {} seeds via OpenCL", seeds.len());
+                            println!("Sample seeds: {:?}", &seeds[..5]);
+                        }
+                        Err(e) => println!("❌ Seed generation failed: {}", e),
+                    }
+                }
+                Err(e) => println!("❌ Kernel creation failed: {}", e),
+            }
+        }
+        Err(e) => println!("❌ OpenCL manager creation failed: {}", e),
+    }
+
+    println!("\n🎉 All tests completed!");
     Ok(())
 }

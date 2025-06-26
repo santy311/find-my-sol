@@ -68,5 +68,26 @@
     "pattern_matched": "abcd",
     "attempts": 149936,
     "found_at": "2025-06-26T21:14:52.112462Z"
+  },
+  {
+    "public_key": "ABnUbFtoMNi4L2H8t9wPYYR9FGGL6R7dMGopX3fBoxGF",
+    "private_key": "2hRW1kHufeorkZtxW8PgowE3exSaVSbpxyANTS5GPYWjo2QfWArUWebhZ7fT3URbFdeATR7q1hRR6jG59e66sWMd",
+    "pattern_matched": "ab",
+    "attempts": 218,
+    "found_at": "2025-06-26T21:28:12.051074Z"
+  },
+  {
+    "public_key": "ABc9RR5PodPZqS3TCq5MYqvUuu4g9Y1WassjTe8rKS4y",
+    "private_key": "4iN3DokPvp8FiyoACcFE3jJz85qBuBSqLk7k7MY1Ndd6k5YzZjHa669aUx2CNAmthNykoTTisfWZ5739r9vWeBQM",
+    "pattern_matched": "abc",
+    "attempts": 4517,
+    "found_at": "2025-06-26T21:30:05.872734Z"
+  },
+  {
+    "public_key": "AbCAt6fTPzFVByXBfCVxcnKyuw2QVaLpDzd5ZypqsrVS",
+    "private_key": "3vygcGbUkjv9AJdeM2QoGAbwUi36gr3483bQrs7DQX3myXZDeApqU1mzdbJkbBWR1hoaz4DK4z2LN9RGPXFijHDn",
+    "pattern_matched": "abc",
+    "attempts": 6112,
+    "found_at": "2025-06-26T21:30:05.902828Z"
   }
 ]

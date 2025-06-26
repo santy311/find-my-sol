@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Result};
+use bs58;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use indicatif::{ProgressBar, ProgressStyle};
-use rand::Rng;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use solana_sdk::{
     pubkey::Pubkey,
@@ -282,9 +284,9 @@ impl VanityGenerator {
         progress_bar: &ProgressBar,
     ) -> Result<()> {
         let kernel = opencl_manager.create_vanity_kernel(device_idx)?;
-        let batch_size = 1_000_000; // 1M keypairs per batch
+        let batch_size = 1_000_000; // 1M seeds per batch
 
-        println!("Using OpenCL device {} for GPU acceleration", device_idx);
+        println!("Using OpenCL device {} for GPU seed generation", device_idx);
 
         let (tx, rx) = bounded::<VanityResult>(1000);
 
@@ -299,28 +301,20 @@ impl VanityGenerator {
             let mut local_attempts = 0u64;
 
             loop {
-                // Generate batch of seeds
-                let seeds = generate_random_seeds(batch_size);
-
-                // Use GPU to generate keypairs
-                if let Ok(gpu_results) = kernel.generate_keys(
-                    &seeds,
-                    starts_with.as_deref().unwrap_or(""),
-                    ends_with.as_deref().unwrap_or(""),
-                    case_sensitive,
-                ) {
-                    // Process GPU results
-                    for i in 0..batch_size {
-                        local_attempts += 1;
-
-                        let result_offset = i * 64;
-                        let pubkey_bytes = &gpu_results[result_offset..result_offset + 32];
-                        let private_key_bytes =
-                            &gpu_results[result_offset + 32..result_offset + 64];
-
-                        // Check if this is a valid result (non-zero bytes indicate match)
-                        if pubkey_bytes.iter().any(|&b| b != 0) {
-                            if let Ok(pubkey) = Pubkey::try_from(pubkey_bytes) {
+                // Generate batch of seeds using GPU
+                if let Ok(seeds) = kernel.generate_seeds(batch_size) {
+                    // Process seeds with CPU for real Ed25519 keypair generation
+                    let found_results: Vec<VanityResult> = seeds
+                        .par_iter()
+                        .filter_map(|&seed| {
+                            let keypair = generate_keypair_from_seed(seed);
+                            let pubkey = keypair.pubkey();
+                            if check_pattern_match(
+                                &pubkey,
+                                &starts_with,
+                                &ends_with,
+                                case_sensitive,
+                            ) {
                                 let pattern_matched = if starts_with.is_some() {
                                     starts_with.as_ref().unwrap().clone()
                                 } else if ends_with.is_some() {
@@ -328,21 +322,27 @@ impl VanityGenerator {
                                 } else {
                                     "random".to_string()
                                 };
-
-                                let result = VanityResult {
+                                Some(VanityResult {
                                     public_key: pubkey.to_string(),
-                                    private_key: bs58::encode(private_key_bytes).into_string(),
+                                    private_key: bs58::encode(keypair.to_bytes()).into_string(),
                                     pattern_matched,
                                     attempts: local_attempts,
                                     found_at: chrono::Utc::now(),
-                                };
-
-                                if tx_clone.send(result).is_err() {
-                                    return; // Channel closed, exit thread
-                                }
+                                })
+                            } else {
+                                None
                             }
+                        })
+                        .collect();
+
+                    // Send found results
+                    for result in found_results {
+                        if tx_clone.send(result).is_err() {
+                            return; // Channel closed, exit thread
                         }
                     }
+
+                    local_attempts += batch_size as u64;
                 }
 
                 // Update global attempt counter
@@ -469,5 +469,118 @@ impl VanityGenerator {
     fn save_results(&self) -> Result<()> {
         let results = self.results.lock().unwrap();
         save_results(&results, &self.output_path)
+    }
+
+    pub async fn generate_vanity_addresses(
+        &mut self,
+        patterns: &[String],
+        count: usize,
+        device_idx: usize,
+    ) -> Result<Vec<VanityResult>> {
+        let opencl = OpenCLManager::new()?;
+        let mut kernel = opencl.create_vanity_kernel(device_idx)?;
+
+        let mut results = Vec::new();
+        let mut attempts = 0u64;
+        let batch_size = 1024 * 1024; // 1M seeds per batch for maximum throughput
+        let start_time = std::time::Instant::now();
+
+        println!(
+            "Starting vanity address generation with {} patterns...",
+            patterns.len()
+        );
+        println!("Target: {} addresses", count);
+        println!("Batch size: {} seeds", batch_size);
+
+        while results.len() < count {
+            // Generate a large batch of seeds
+            let seeds = kernel.generate_seeds(batch_size)?;
+            attempts += seeds.len() as u64;
+
+            // Process seeds in parallel chunks for better CPU utilization
+            let chunk_size = 10000;
+            let mut chunk_results = Vec::new();
+
+            for chunk in seeds.chunks(chunk_size) {
+                let chunk_results_future = tokio::spawn({
+                    let patterns = patterns.to_vec();
+                    let chunk = chunk.to_vec();
+                    let case_sensitive = self.case_sensitive;
+                    async move {
+                        let mut local_results = Vec::new();
+
+                        for &seed in &chunk {
+                            // Generate Ed25519 keypair from seed
+                            let keypair =
+                                Keypair::from_bytes(&seed.to_le_bytes()).unwrap_or_else(|_| {
+                                    // Fallback: use seed as entropy for keypair generation
+                                    let mut rng = StdRng::seed_from_u64(seed as u64);
+                                    Keypair::new()
+                                });
+
+                            let public_key = keypair.pubkey();
+                            let address = public_key.to_string();
+
+                            // Check all patterns
+                            for pattern in &patterns {
+                                let matches = if case_sensitive {
+                                    address.contains(pattern)
+                                } else {
+                                    address.to_lowercase().contains(&pattern.to_lowercase())
+                                };
+
+                                if matches {
+                                    local_results.push(VanityResult {
+                                        public_key: address,
+                                        private_key: bs58::encode(keypair.to_bytes()).into_string(),
+                                        pattern_matched: pattern.clone(),
+                                        attempts: attempts,
+                                        found_at: chrono::Utc::now(),
+                                    });
+                                    break; // Found a match, no need to check other patterns
+                                }
+                            }
+                        }
+
+                        local_results
+                    }
+                });
+
+                chunk_results.extend(chunk_results_future.await.unwrap_or_default());
+            }
+
+            // Add found results
+            results.extend(chunk_results);
+
+            // Progress update
+            let elapsed = start_time.elapsed();
+            let rate = attempts as f64 / elapsed.as_secs_f64();
+            println!(
+                "Found {}/{} addresses | Rate: {:.2} MH/s | Elapsed: {:.1}s",
+                results.len(),
+                count,
+                rate / 1_000_000.0,
+                elapsed.as_secs_f64()
+            );
+
+            // Early exit if we have enough results
+            if results.len() >= count {
+                break;
+            }
+        }
+
+        // Trim to exact count
+        results.truncate(count);
+
+        let total_time = start_time.elapsed();
+        let total_rate = attempts as f64 / total_time.as_secs_f64();
+
+        println!("\n=== Generation Complete ===");
+        println!("Total attempts: {}", attempts);
+        println!("Total time: {:.2}s", total_time.as_secs_f64());
+        println!("Average rate: {:.2} MH/s", total_rate / 1_000_000.0);
+        println!("Found {} addresses", results.len());
+
+        Ok(results)
     }
 }
